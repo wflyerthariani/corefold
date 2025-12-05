@@ -16,89 +16,31 @@
 */
 
 include { COREFOLD  } from './workflows/corefold'
-include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_corefold_pipeline'
-include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_corefold_pipeline'
-include { getGenomeAttribute      } from './subworkflows/local/utils_nfcore_corefold_pipeline'
-
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    GENOME PARAMETER VALUES
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
-
-// TODO nf-core: Remove this line if you don't need a FASTA file
-//   This is an example of how to use getGenomeAttribute() to fetch parameters
-//   from igenomes.config using `--genome`
-params.fasta = getGenomeAttribute('fasta')
-
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    NAMED WORKFLOWS FOR PIPELINE
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
-
-//
-// WORKFLOW: Run main analysis pipeline depending on type of input
-//
-workflow NFCORE_COREFOLD {
-
-    take:
-    samplesheet // channel: samplesheet read in from --input
-
-    main:
-
-    //
-    // WORKFLOW: Run pipeline
-    //
-    COREFOLD (
-        samplesheet
-    )
-    emit:
-    multiqc_report = COREFOLD.out.multiqc_report // channel: /path/to/multiqc_report.html
-}
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    RUN MAIN WORKFLOW
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
+include { design_pipeline } from './subworkflows/local/design_pipeline.nf'
+include { input_prep } from './subworkflows/local/inputprep.nf'
 
 workflow {
 
-    main:
-    //
-    // SUBWORKFLOW: Run initialisation tasks
-    //
-    PIPELINE_INITIALISATION (
-        params.version,
-        params.validate_params,
-        params.monochrome_logs,
-        args,
-        params.outdir,
-        params.input
-    )
+    // Validate required params (nf-core style pipelines enforce params.outdir at least)
+    if (!params.outdir) {
+        log.error "Missing required param --outdir"
+        exit 1
+    }
+    if (!params.num_designs) {
+        log.error "Missing required param --num_designs"
+        exit 1
+    }
+    if (!params.output_prefix) {
+        log.error "Missing required param --output_prefix"
+        exit 1
+    }
 
-    //
-    // WORKFLOW: Run main workflow
-    //
-    NFCORE_COREFOLD (
-        PIPELINE_INITIALISATION.out.samplesheet
-    )
-    //
-    // SUBWORKFLOW: Run completion tasks
-    //
-    PIPELINE_COMPLETION (
-        params.email,
-        params.email_on_fail,
-        params.plaintext_email,
-        params.outdir,
-        params.monochrome_logs,
-        params.hook_url,
-        NFCORE_COREFOLD.out.multiqc_report
-    )
+    // Build the rf input tuples (output_prefix, start_index)
+    ch_designs = input_prep(params.output_prefix, params.num_designs)
+
+    // Run the pipeline subworkflow (RFdiffusion -> ProteinMPNN -> AlphaFold)
+    results = design_pipeline(ch_designs)
+
+    // Optionally write a simple view (you can remove this in production)
+    results.view { it -> "ALPHAFOLD_DONE: ${it}" }
 }
-
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    THE END
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
