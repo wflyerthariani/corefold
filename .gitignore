@@ -7,3 +7,7 @@ testing/
 testing*
 *.pyc
 null/
+containers/
+outputs/
+input_pdbs/
+*.pdb
