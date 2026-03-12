@@ -1,7 +1,8 @@
 # Base inference Configuration.
 
 inference:
-  input_pdb: /ibex/user/x_thariaa/CoreFold/nf-core-corefold/6px6.pdb
+  input_pdb: /inputs/5TPN.pdb
+  num_designs: 1
   ckpt_override_path: null
   symmetry: null
   recenter: True
@@ -16,13 +17,13 @@ inference:
   final_step: 1
   deterministic: False
   trb_save_ckpt_path: null
-  schedule_directory_path: null
-  model_directory_path: null
+  schedule_directory_path: /inputs/schedules
+  model_directory_path: /inputs/models
   cyclic: False 
   cyc_chains: 'a'
 
 contigmap:
-  contigs: [30-50/A2-35/30-50]
+  contigs: [150-150]
   inpaint_seq: null
   inpaint_str: null
   inpaint_str_helix: null
